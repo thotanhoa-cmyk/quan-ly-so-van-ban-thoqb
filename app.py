@@ -99,3 +99,18 @@ else:
         st.download_button("📥 Tải file Excel tổng hợp", data=csv, file_name=f"so_van_ban_{MA_TRUONG}.csv")
     else:
         st.write("Chưa có dữ liệu nào được cấp.")
+# --- CHẾ ĐỘ XÓA DỮ LIỆU (CHỈ DÀNH CHO ADMIN) ---
+    st.divider()
+    with st.expander("🛠 Chế độ chỉnh sửa (Dành cho Admin)"):
+        st.warning("Cẩn thận: Thao tác xóa sẽ không thể khôi phục!")
+        df_edit = pd.read_csv(DATA_FILE)
+        
+        # Chọn dòng muốn xóa
+        row_to_delete = st.number_input("Nhập chỉ số dòng muốn xóa (Số thứ tự ở cột ngoài cùng bên trái bảng lịch sử):", 
+                                        min_value=0, max_value=len(df_edit)-1, step=1)
+        
+        if st.button("❌ XÁC NHẬN XÓA DÒNG NÀY"):
+            df_edit = df_edit.drop(df_edit.index[row_to_delete])
+            df_edit.to_csv(DATA_FILE, index=False)
+            st.success("Đã xóa dòng thành công! Vui lòng F5 lại trang.")
+            st.rerun()
