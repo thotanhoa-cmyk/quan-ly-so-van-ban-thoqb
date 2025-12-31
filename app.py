@@ -4,61 +4,74 @@ from datetime import datetime
 import os
 
 # --- CẤU HÌNH ---
-PASSWORD = "truongquocoaib"  # Bạn có thể đổi mật khẩu này
+PASSWORD = "truongquocoaib" 
 DATA_FILE = "data_so_van_ban.csv"
+MA_TRUONG = "THQOB" 
 
-# Khởi tạo file dữ liệu nếu chưa có
+# Danh mục đầy đủ các loại văn bản và ký hiệu tương ứng
+LOAI_VB_DICT = {
+    "Công văn": "CV",
+    "Quyết định": "QĐ",
+    "Tờ trình": "TTr",
+    "Thông báo": "TB",
+    "Báo cáo": "BC",
+    "Giấy mời": "GM",
+    "Biên bản": "BB",
+    "Kế hoạch": "KH",
+    "Hợp đồng": "HĐ",
+    "Quy chế": "QC"
+}
+
+# Khởi tạo file dữ liệu
 if not os.path.exists(DATA_FILE):
-    df = pd.DataFrame(columns=["STT", "Số hiệu", "Loại văn bản", "Trích yếu", "Người lấy", "Ngày tạo"])
+    df = pd.DataFrame(columns=["Loại văn bản", "Số hiệu", "Trích yếu", "Người lấy", "Ngày tạo"])
     df.to_csv(DATA_FILE, index=False)
 
-st.set_page_config(page_title="Hệ thống cấp số văn bản", layout="centered")
+st.set_page_config(page_title="Cấp số văn bản TH Quốc Oai B", layout="wide")
 
-# --- GIAO DIỆN ĐĂNG NHẬP ---
+# Kiểm tra đăng nhập
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    st.title("🔐 Đăng nhập hệ thống")
+    st.title("🔐 Hệ thống nội bộ - Trường TH Quốc Oai B")
     pwd = st.text_input("Nhập mật khẩu đơn vị:", type="password")
-    if st.button("Vào hệ thống"):
+    if st.button("Đăng nhập"):
         if pwd == PASSWORD:
             st.session_state["authenticated"] = True
             st.rerun()
         else:
-            st.error("Sai mật khẩu, vui lòng kiểm tra lại!")
+            st.error("Mật khẩu không đúng!")
 else:
-    # --- GIAO DIỆN CHÍNH ---
-    st.title("📝 Cấp số văn bản nội bộ")
-    st.info(f"Chào mừng bạn! Hệ thống đang quản lý số cho năm {datetime.now().year}")
+    st.title(f"📝 Quản lý cấp số văn bản năm {datetime.now().year}")
 
     with st.form("form_lay_so"):
         col1, col2 = st.columns(2)
         with col1:
-            loai_vb = st.selectbox("Loại văn bản", ["Công văn", "Quyết định", "Tờ trình", "Thông báo"])
-            ky_hieu = st.text_input("Ký hiệu (Vd: TH-QO)", "TH-QO")
+            loai_chon = st.selectbox("Chọn loại văn bản:", list(LOAI_VB_DICT.keys()))
+            nguoi_lay = st.text_input("Người thực hiện (Ví dụ: Nguyễn Văn A)")
         with col2:
-            nguoi_lay = st.text_input("Người soạn thảo")
-            
-        trich_yeu = st.text_area("Trích yếu nội dung văn bản")
+            trich_yeu = st.text_area("Trích yếu nội dung (Ghi tóm tắt nội dung văn bản)")
         
-        submit = st.form_submit_button("🔥 LẤY SỐ MỚI")
+        submit = st.form_submit_button("🔥 LẤY SỐ HIỆU")
 
     if submit:
         if not trich_yeu or not nguoi_lay:
-            st.warning("Vui lòng điền đầy đủ Trích yếu và Người soạn thảo!")
+            st.error("⚠️ Vui lòng điền đủ 'Người thực hiện' và 'Trích yếu'!")
         else:
             df = pd.read_csv(DATA_FILE)
+            ky_hieu_loai = LOAI_VB_DICT[loai_chon]
             
-            # Tính số tiếp theo cho loại văn bản đó
-            nam_hien_tai = datetime.now().year
-            so_tiep_theo = len(df) + 1
-            so_hieu_full = f"{so_tiep_theo}/{ky_hieu}"
+            # Tự động tìm số tiếp theo của riêng loại văn bản đó
+            df_loai_nay = df[df["Loại văn bản"] == loai_chon]
+            so_tiep_theo = len(df_loai_nay) + 1
+            
+            # Định dạng: 01/QĐ-THQOB
+            so_hieu_full = f"{so_tiep_theo:02d}/{ky_hieu_loai}-{MA_TRUONG}"
             
             new_data = {
-                "STT": so_tiep_theo,
+                "Loại văn bản": loai_chon,
                 "Số hiệu": so_hieu_full,
-                "Loại văn bản": loai_vb,
                 "Trích yếu": trich_yeu,
                 "Người lấy": nguoi_lay,
                 "Ngày tạo": datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -67,19 +80,22 @@ else:
             df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
             
-            st.success(f"Số văn bản của bạn là: **{so_hieu_full}**")
+            st.success(f"✅ Đã cấp số thành công cho {loai_chon}!")
+            st.code(so_hieu_full, language="text")
             st.balloons()
 
-    # --- LỊCH SỬ ---
+    # --- BẢNG THỐNG KÊ ---
     st.divider()
-    st.subheader("📋 Lịch sử cấp số")
-    df_display = pd.read_csv(DATA_FILE)
-    st.dataframe(df_display.sort_values(by="STT", ascending=False), use_container_width=True)
-
-    # Nút tải file Excel cho Admin
-    csv = df_display.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 Tải về file Excel (CSV)", data=csv, file_name="danh_sach_cap_so.csv", mime="text/csv")
+    st.subheader("📋 Nhật ký cấp số gần đây")
     
-    if st.button("Đăng xuất"):
-        st.session_state["authenticated"] = False
-        st.rerun()
+    # Đọc lại dữ liệu để hiển thị
+    df_show = pd.read_csv(DATA_FILE)
+    if not df_show.empty:
+        # Hiển thị từ mới nhất đến cũ nhất
+        st.dataframe(df_show.iloc[::-1], use_container_width=True)
+        
+        # Cho phép tải Excel
+        csv = df_show.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 Tải file Excel tổng hợp", data=csv, file_name=f"so_van_ban_{MA_TRUONG}.csv")
+    else:
+        st.write("Chưa có dữ liệu nào được cấp.")
