@@ -85,7 +85,7 @@ else:
 
     # --- TAB 1: LẤY SỐ VĂN BẢN ---
     if menu == "🚀 Lấy số văn bản":
-        st.markdown("<h1>🚀 Đăng ký cấp số mới</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>🚀 Đăng ký cấp số văn bản mới</h1>", unsafe_allow_html=True)
         with st.form("form_cap_so"):
             c1, c2 = st.columns(2)
             with c1:
