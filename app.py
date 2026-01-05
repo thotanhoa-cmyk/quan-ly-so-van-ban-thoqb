@@ -7,13 +7,13 @@ import os
 DATA_FILE = "data_so_van_ban.csv"
 MA_TRUONG = "THQOB"
 
-# 1. Cập nhật danh sách tài khoản (Đã đổi huongqob thành thuydo)
+# 1. Cập nhật danh sách tài khoản: Bỏ "qob", mật khẩu là tên + 2026
 USERS_CONFIG = {
-    "haopham": ["haopham2026", "Phạm Thị Hảo"],
-    "thopham": ["thopham2026", "Phạm Xuân Thọ"],
+    "hao": ["hao2026", "Phạm Thị Hảo"],
+    "tho": ["tho2026", "Phạm Xuân Thọ"],
     "thaonguyen": ["thaonguyen2026", "Nguyễn Thị Phương Thảo"],
     "thaole": ["thaole2026", "Lê Thị Thảo"],
-    "thuydo": ["thuydo2026", "Đỗ Thị Thúy"], # Tài khoản mới cập nhật
+    "thuy": ["thuy2026", "Đỗ Thị Thúy"],
     "admin": ["admin2026", "Quản trị viên"]
 }
 
@@ -26,14 +26,12 @@ LOAI_VB_DICT = {
 DANH_SACH_NGUOI_KY = ["Phạm Thị Hảo", "Nguyễn Thị Phương Thảo"]
 DANH_SACH_CHUC_VU = ["Hiệu trưởng", "Phó Hiệu trưởng"]
 
-# Khởi tạo dữ liệu
 if not os.path.exists(DATA_FILE):
     df = pd.DataFrame(columns=["Loại văn bản", "Số hiệu", "Ngày văn bản", "Trích yếu", "Người thực hiện", "Người ký", "Chức vụ", "Ngày tạo hệ thống", "Tháng"])
     df.to_csv(DATA_FILE, index=False)
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide")
 
-# --- QUẢN LÝ ĐĂNG NHẬP ---
 if "user_id" not in st.session_state:
     st.session_state["user_id"] = None
 
@@ -59,7 +57,7 @@ else:
         st.session_state["user_id"] = None
         st.rerun()
 
-    # --- TAB 1: LẤY SỐ VĂN BẢN ---
+    # --- TAB 1: LẤY SỐ VAV BẢN ---
     if menu == "🚀 Lấy số văn bản":
         st.subheader("📝 Đăng ký cấp số mới")
         with st.form("form_cap_so"):
@@ -71,8 +69,8 @@ else:
                 
                 if user_id == "admin":
                     st.info("🛠 CHẾ ĐỘ ADMIN")
-                    is_chen = st.checkbox("Kích hoạt chèn số/chữ tùy chỉnh")
-                    so_hieu_tuy_chinh = st.text_input("Nhập đầy đủ số hiệu muốn chèn (Vd: 99a/QĐ-THQOB)")
+                    is_chen = st.checkbox("Kích hoạt chèn số hiệu tùy chỉnh")
+                    so_hieu_tuy_chinh = st.text_input("Nhập số hiệu chèn (Vd: 01a/BC-THQOB)")
             
             with c2:
                 nguoi_ky = st.selectbox("Người ký", DANH_SACH_NGUOI_KY)
@@ -85,10 +83,15 @@ else:
             df = pd.read_csv(DATA_FILE)
             is_dup = df['Trích yếu'].str.strip().str.lower().eq(trich_yeu.strip().lower()).any()
             
-            if is_dup and user_id != "admin":
-                st.error("🚫 Nội dung này đã có người lấy số! Vui lòng liên hệ Admin.")
-            elif not trich_yeu:
-                st.warning("Vui lòng nhập trích yếu nội dung.")
+            if is_dup:
+                if user_id == "admin":
+                    st.warning("⚠️ Chú ý: Trích yếu này đã tồn tại, nhưng Admin vẫn có quyền cấp số.")
+                else:
+                    st.error("🚫 Nội dung này đã có người lấy số! Vui lòng liên hệ Admin.")
+                    st.stop()
+
+            if not trich_yeu:
+                st.error("Vui lòng nhập trích yếu nội dung.")
             else:
                 if user_id == "admin" and is_chen and so_hieu_tuy_chinh:
                     so_hieu_final = so_hieu_tuy_chinh
@@ -110,6 +113,7 @@ else:
                     "Tháng": ngay_van_ban.strftime("%m/%Y")
                 }
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                df = df.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, True])
                 df.to_csv(DATA_FILE, index=False)
                 st.success(f"✅ Đã cấp số: {so_hieu_final}")
                 st.balloons()
@@ -122,26 +126,38 @@ else:
         if search:
             df_view = df_view[df_view.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
         
-        df_display = df_view.copy()
-        df_display.insert(0, 'STT', range(1, len(df_display) + 1))
-        st.dataframe(df_display.iloc[::-1], use_container_width=True, hide_index=True)
+        if not df_view.empty:
+            df_view = df_view.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, True])
+            df_display = df_view.copy()
+            df_display.insert(0, 'STT', range(1, len(df_display) + 1))
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            csv = df_view.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Tải file Excel tổng hợp", data=csv, file_name=f"so_van_ban_THQOB.csv")
 
         if user_id == "admin" and not df_view.empty:
             st.divider()
-            idx_del = st.number_input("Xóa dòng STT:", min_value=1, max_value=len(df_display), step=1)
+            st.subheader("🛠 Quyền xóa của Admin")
+            id_to_del = st.text_input("Nhập Số hiệu muốn xóa:")
             if st.button("❌ XÁC NHẬN XÓA"):
                 df_origin = pd.read_csv(DATA_FILE)
-                row_val = df_display.iloc[len(df_display) - idx_del]
-                df_origin = df_origin[df_origin["Số hiệu"] != row_val["Số hiệu"]]
-                df_origin.to_csv(DATA_FILE, index=False)
-                st.rerun()
+                if id_to_del in df_origin["Số hiệu"].values:
+                    df_origin = df_origin[df_origin["Số hiệu"] != id_to_del]
+                    df_origin.to_csv(DATA_FILE, index=False)
+                    st.success(f"Đã xóa số hiệu {id_to_del}")
+                    st.rerun()
+                else:
+                    st.error("Không tìm thấy số hiệu này.")
 
     # --- TAB 3: THỐNG KÊ ---
     elif menu == "📊 Thống kê":
-        st.subheader("📊 Báo cáo")
+        st.subheader("📊 Báo cáo tổng hợp")
         df_tk = pd.read_csv(DATA_FILE)
         if not df_tk.empty:
-            st.write("**Thống kê theo người thực hiện:**")
-            st.bar_chart(df_tk["Người thực hiện"].value_counts())
-            st.write("**Chi tiết danh sách:**")
-            st.dataframe(df_tk)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Thống kê theo người thực hiện:**")
+                st.bar_chart(df_tk["Người thực hiện"].value_counts())
+            with col2:
+                st.write("**Số lượng theo loại văn bản:**")
+                st.write(df_tk["Loại văn bản"].value_counts())
