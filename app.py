@@ -38,11 +38,9 @@ st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
     .stButton>button { border-radius: 8px; font-weight: bold; }
-    .btn-delete>div>button {
-        background-color: #ff4b4b !important;
-        color: white !important;
-    }
+    .btn-delete>div>button { background-color: #ff4b4b !important; color: white !important; }
     h1, h2, h3 { color: #1e3a8a !important; text-align: center; }
+    .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -71,7 +69,8 @@ else:
     with st.sidebar:
         st.image(LOGO_URL, width=100)
         st.info(f"Cán bộ: **{user_name}**")
-        menu = st.radio("MENU", ["🚀 Lấy số văn bản", "🔍 Nhật ký văn bản", "📊 Báo cáo tháng"])
+        menu = st.sidebar.selectbox("MENU QUẢN LÝ", ["🚀 Lấy số văn bản", "🔍 Nhật ký văn bản", "📊 Báo cáo & Thống kê"])
+        st.divider()
         if st.button("🚪 Đăng xuất"):
             st.session_state["user_id"] = None
             st.rerun()
@@ -128,11 +127,11 @@ else:
                     st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
                     st.balloons()
 
-    # --- TAB 2: NHẬT KÝ (PHỤC HỒI XÓA) ---
+    # --- TAB 2: NHẬT KÝ & XÓA ---
     elif menu == "🔍 Nhật ký văn bản":
-        st.markdown("<h1>🔍 Nhật ký lưu trữ</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>🔍 Nhật ký lưu trữ văn bản</h1>", unsafe_allow_html=True)
         df_view = pd.read_csv(DATA_FILE)
-        search = st.text_input("🔍 Tìm kiếm nhanh...")
+        search = st.text_input("🔍 Tìm kiếm nhanh (Số hiệu, nội dung, người thực hiện...)", placeholder="Nhập từ khóa...")
         if search:
             df_view = df_view[df_view.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
         
@@ -142,18 +141,16 @@ else:
             df_display.insert(0, 'STT', range(1, len(df_display) + 1))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        # PHẦN XÓA DÀNH RIÊNG CHO ADMIN
         if user_id == "admin":
             st.divider()
             st.subheader("🛠 QUYỀN HẠN ADMIN")
             col_del_1, col_del_2 = st.columns([3, 1])
             with col_del_1:
-                id_to_del = st.text_input("Nhập Số hiệu muốn xóa (Vd: 01/BC-THQOB):", key="del_input")
+                id_to_del = st.text_input("Nhập Số hiệu muốn xóa chính xác:", key="del_input")
             with col_del_2:
                 st.markdown("<div class='btn-delete'>", unsafe_allow_html=True)
                 btn_delete = st.button("❌ XÓA SỐ NÀY", use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-            
             if btn_delete:
                 df_origin = pd.read_csv(DATA_FILE)
                 if id_to_del in df_origin["Số hiệu"].values:
@@ -162,19 +159,57 @@ else:
                     st.success(f"Đã xóa thành công số hiệu: {id_to_del}")
                     st.rerun()
                 else:
-                    st.error("Không tìm thấy số hiệu này trong hệ thống!")
+                    st.error("Không tìm thấy số hiệu này!")
 
-    # --- TAB 3: BÁO CÁO ---
-    elif menu == "📊 Báo cáo tháng":
-        st.markdown("<h1>📊 Báo cáo quản trị</h1>", unsafe_allow_html=True)
-        df_tk = pd.read_csv(DATA_FILE)
-        if not df_tk.empty:
-            thang_hien_tai = date.today().strftime("%m/%Y")
-            df_thang = df_tk[df_tk["Tháng"] == thang_hien_tai]
+    # --- TAB 3: BÁO CÁO TỔNG HỢP (NĂM & THÁNG) ---
+    elif menu == "📊 Báo cáo & Thống kê":
+        st.markdown("<h1>📊 Trung tâm dữ liệu & Báo cáo</h1>", unsafe_allow_html=True)
+        df_raw = pd.read_csv(DATA_FILE)
+        
+        if df_raw.empty:
+            st.info("Chưa có dữ liệu để báo cáo.")
+        else:
+            # 1. Thống kê Tổng quan (Năm)
+            st.subheader("🗓 Tổng quan năm 2026")
             c1, c2, c3 = st.columns(3)
-            with c1: st.metric("Tổng văn bản năm", len(df_tk))
-            with c2: st.metric(f"Văn bản tháng {thang_hien_tai}", len(df_thang))
+            with c1:
+                st.metric("Tổng văn bản đã cấp", len(df_raw))
+            with c2:
+                most_user = df_raw["Người thực hiện"].mode()[0] if not df_raw.empty else "N/A"
+                st.metric("Cán bộ tích cực nhất", most_user)
             with c3:
-                csv = df_thang.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(f"📥 Tải BC tháng {thang_hien_tai}", data=csv, file_name=f"BC_{thang_hien_tai}.csv")
-            st.bar_chart(df_tk["Người thực hiện"].value_counts())
+                # Tải toàn bộ sổ văn bản năm
+                csv_year = df_raw.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 Tải Sổ Văn Bản Cả Năm (Excel)", data=csv_year, file_name="So_Van_Ban_2026.csv", use_container_width=True)
+            
+            st.divider()
+            
+            # 2. Báo cáo chi tiết theo Tháng
+            st.subheader("📂 Chi tiết theo Tháng")
+            list_thang = sorted(df_raw["Tháng"].unique(), reverse=True)
+            thang_chon = st.selectbox("Chọn tháng muốn xem báo cáo:", list_thang)
+            
+            df_thang = df_raw[df_raw["Tháng"] == thang_chon]
+            
+            col_m1, col_m2 = st.columns([2, 1])
+            with col_m1:
+                st.write(f"**Danh sách văn bản tháng {thang_chon}:**")
+                st.dataframe(df_thang[["Số hiệu", "Ngày văn bản", "Trích yếu", "Người thực hiện"]], use_container_width=True, hide_index=True)
+            with col_m2:
+                st.write(f"**Hành động:**")
+                st.metric(f"Số lượng trong tháng", len(df_thang))
+                csv_month = df_thang.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(f"📥 Tải Báo Cáo Tháng {thang_chon}", data=csv_month, file_name=f"Bao_cao_thang_{thang_chon.replace('/','_')}.csv", use_container_width=True)
+
+            st.divider()
+            
+            # 3. Biểu đồ thống kê
+            st.subheader("📈 Biểu đồ xu hướng")
+            chart_col1, chart_col2 = st.columns(2)
+            with chart_col1:
+                st.write("**Số lượng văn bản theo từng tháng:**")
+                df_counts = df_raw.groupby("Tháng").size().reset_index(name='Số lượng')
+                st.bar_chart(df_counts.set_index("Tháng"))
+            with chart_col2:
+                st.write("**Tỷ lệ các loại văn bản:**")
+                st.write(df_raw["Loại văn bản"].value_counts())
