@@ -6,7 +6,7 @@ import os
 # --- CẤU HÌNH HỆ THỐNG ---
 DATA_FILE = "data_so_van_ban.csv"
 MA_TRUONG = "THQOB"
-# Link ảnh logo trường (Đã được chuyển hướng để hiển thị trực tiếp)
+# Link logo trực tiếp bạn vừa gửi
 LOGO_URL = "http://truongtieuhocthitranquocoaib.edu.vn/upload/101647/20260105/ESTD2_5e92c.png" 
 
 USERS_CONFIG = {
@@ -38,34 +38,15 @@ st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout=
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #e6e9ef;
-    }
     .stButton>button {
         width: 100%;
         border-radius: 8px;
         background-color: #1e3a8a;
         color: white;
         font-weight: bold;
-        transition: 0.3s;
     }
-    .stButton>button:hover {
-        background-color: #1d4ed8;
-        border: 1px solid #1e3a8a;
-    }
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    h1, h2, h3 { color: #1e3a8a !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .stDataFrame { border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    .login-box {
-        padding: 30px;
-        border-radius: 15px;
-        background: white;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    }
+    h1, h2, h3 { color: #1e3a8a !important; text-align: center; }
+    .stDataFrame { border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -76,43 +57,36 @@ if "user_id" not in st.session_state:
 if st.session_state["user_id"] is None:
     col_l, col_m, col_r = st.columns([1, 1.5, 1])
     with col_m:
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         st.image(LOGO_URL, width=150)
-        st.markdown("<h2 style='margin-bottom: 0;'>TRƯỜNG TIỂU HỌC</h2>", unsafe_allow_html=True)
-        st.markdown("<h1 style='margin-top: 0;'>THỊ TRẤN QUỐC OAI B</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #666;'>Hệ thống quản lý văn bản nội bộ</p>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<h1>TRƯỜNG TIỂU HỌC</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>QUỐC OAI B</h1>", unsafe_allow_html=True)
         
-        with st.container():
-            u_input = st.text_input("👤 Tên đăng nhập", placeholder="Nhập tài khoản...")
-            p_input = st.text_input("🔑 Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            if st.button("ĐĂNG NHẬP HỆ THỐNG"):
-                if u_input in USERS_CONFIG and USERS_CONFIG[u_input][0] == p_input:
-                    st.session_state["user_id"] = u_input
-                    st.session_state["user_name"] = USERS_CONFIG[u_input][1]
-                    st.rerun()
-                else:
-                    st.error("Sai tài khoản hoặc mật khẩu, vui lòng thử lại!")
+        u_input = st.text_input("👤 Tên đăng nhập")
+        p_input = st.text_input("🔑 Mật khẩu", type="password")
+        if st.button("ĐĂNG NHẬP"):
+            if u_input in USERS_CONFIG and USERS_CONFIG[u_input][0] == p_input:
+                st.session_state["user_id"] = u_input
+                st.session_state["user_name"] = USERS_CONFIG[u_input][1]
+                st.rerun()
+            else:
+                st.error("Thông tin đăng nhập không chính xác!")
 else:
     user_id = st.session_state["user_id"]
     user_name = st.session_state["user_name"]
     
-    # Sidebar Cá nhân hóa
     with st.sidebar:
         st.image(LOGO_URL, width=100)
         st.markdown(f"### TH QUỐC OAI B")
-        st.info(f"Xin chào: **{user_name}**")
-        st.divider()
-        menu = st.radio("DANH MỤC QUẢN LÝ", ["🚀 Cấp số văn bản", "🔍 Nhật ký lưu trữ", "📊 Báo cáo & Thống kê"])
-        st.divider()
+        st.info(f"Cán bộ: **{user_name}**")
+        menu = st.radio("MENU", ["🚀 Lấy số văn bản", "🔍 Nhật ký văn bản", "📊 Báo cáo tháng"])
         if st.button("🚪 Đăng xuất"):
             st.session_state["user_id"] = None
             st.rerun()
 
-    # --- TAB 1: LẤY SỐ VĂN BẢN (GIỮ NGUYÊN LOGIC CHẶN TRÙNG) ---
-    if menu == "🚀 Cấp số văn bản":
+    # --- TAB 1: LẤY SỐ VĂN BẢN ---
+    if menu == "🚀 Lấy số văn bản":
         st.markdown("<h1>🚀 Đăng ký cấp số mới</h1>", unsafe_allow_html=True)
-        with st.form("form_cap_so", clear_on_submit=False):
+        with st.form("form_cap_so"):
             c1, c2 = st.columns(2)
             with c1:
                 loai_chon = st.selectbox("📁 Loại văn bản", list(LOAI_VB_DICT.keys()))
@@ -121,23 +95,23 @@ else:
             with c2:
                 nguoi_ky = st.selectbox("✍️ Người ký", DANH_SACH_NGUOI_KY)
                 chuc_vu = st.selectbox("🎓 Chức vụ", DANH_SACH_CHUC_VU)
-                trich_yeu = st.text_area("📝 Trích yếu nội dung", placeholder="Nhập nội dung vắn tắt của văn bản...")
+                trich_yeu = st.text_area("📝 Trích yếu nội dung")
 
             if user_id == "admin":
-                with st.expander("🛠 Chế độ Admin (Chèn số)"):
-                    is_chen = st.checkbox("Kích hoạt chèn số hiệu tùy chỉnh")
-                    so_hieu_tuy_chinh = st.text_input("Số hiệu muốn chèn (Vd: 05a/CV-THQOB)")
+                with st.expander("🛠 Chế độ Admin"):
+                    is_chen = st.checkbox("Kích hoạt chèn số tùy chỉnh")
+                    so_hieu_tuy_chinh = st.text_input("Số hiệu chèn (Vd: 01a/BC-THQOB)")
 
             if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
                 df = pd.read_csv(DATA_FILE)
-                trich_yeu_moi = trich_yeu.strip().lower()
+                trich_yeu_moi = str(trich_yeu).strip().lower()
                 is_dup = df['Trích yếu'].apply(lambda x: str(x).strip().lower()).eq(trich_yeu_moi).any()
 
                 if not trich_yeu.strip():
                     st.error("Vui lòng nhập trích yếu!")
                 elif is_dup and user_id != "admin":
                     so_cu = df[df['Trích yếu'].apply(lambda x: str(x).strip().lower()) == trich_yeu_moi]['Số hiệu'].values[0]
-                    st.error(f"🚫 TRÙNG TRÍCH YẾU: Nội dung này đã lấy số {so_cu} trước đó.")
+                    st.error(f"🚫 TRÙNG LẶP: Nội dung này đã lấy số {so_cu}.")
                 else:
                     if user_id == "admin" and is_chen and so_hieu_tuy_chinh:
                         so_hieu_final = so_hieu_tuy_chinh
@@ -161,12 +135,11 @@ else:
                     st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
                     st.balloons()
 
-    # --- TAB 2: NHẬT KÝ (SẮP XẾP ĐA TẦNG) ---
-    elif menu == "🔍 Nhật ký lưu trữ":
-        st.markdown("<h1>🔍 Nhật ký văn bản</h1>", unsafe_allow_html=True)
+    # --- TAB 2: NHẬT KÝ ---
+    elif menu == "🔍 Nhật ký văn bản":
+        st.markdown("<h1>🔍 Nhật ký lưu trữ</h1>", unsafe_allow_html=True)
         df_view = pd.read_csv(DATA_FILE)
-        search = st.text_input("🔍 Tìm nhanh (Số hiệu, trích yếu, người ký...)", placeholder="Nhập từ khóa tìm kiếm...")
-        
+        search = st.text_input("🔍 Tìm kiếm nhanh...")
         if search:
             df_view = df_view[df_view.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
         
@@ -176,39 +149,18 @@ else:
             df_display.insert(0, 'STT', range(1, len(df_display) + 1))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        if user_id == "admin" and not df_view.empty:
-            with st.expander("🛠 QUẢN TRỊ: Xóa dòng dữ liệu"):
-                id_to_del = st.text_input("Nhập Số hiệu chính xác để xóa:")
-                if st.button("❌ XÁC NHẬN XÓA"):
-                    df_origin = pd.read_csv(DATA_FILE)
-                    df_origin = df_origin[df_origin["Số hiệu"] != id_to_del]
-                    df_origin.to_csv(DATA_FILE, index=False)
-                    st.success("Đã xóa dữ liệu thành công.")
-                    st.rerun()
-
-    # --- TAB 3: THỐNG KÊ & BÁO CÁO THÁNG ---
-    elif menu == "📊 Báo cáo & Thống kê":
-        st.markdown("<h1>📊 Thống kê & Xuất báo cáo</h1>", unsafe_allow_html=True)
+    # --- TAB 3: BÁO CÁO THÁNG ---
+    elif menu == "📊 Báo cáo tháng":
+        st.markdown("<h1>📊 Báo cáo quản trị</h1>", unsafe_allow_html=True)
         df_tk = pd.read_csv(DATA_FILE)
-        
         if not df_tk.empty:
             thang_hien_tai = date.today().strftime("%m/%Y")
             df_thang = df_tk[df_tk["Tháng"] == thang_hien_tai]
-            
             c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Tổng văn bản (Năm)", len(df_tk))
-            with c2:
-                st.metric(f"Văn bản tháng {thang_hien_tai}", len(df_thang))
+            with c1: st.metric("Tổng văn bản năm", len(df_tk))
+            with c2: st.metric(f"Văn bản tháng {thang_hien_tai}", len(df_thang))
             with c3:
-                csv_thang = df_thang.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(f"📥 TẢI BÁO CÁO THÁNG {thang_hien_tai}", data=csv_thang, file_name=f"BC_Thang_{thang_hien_tai.replace('/','_')}.csv")
-            
-            st.divider()
-            col_l, col_r = st.columns(2)
-            with col_l:
-                st.subheader("Số lượng theo cán bộ")
-                st.bar_chart(df_tk["Người thực hiện"].value_counts())
-            with col_r:
-                st.subheader("Tỉ lệ loại văn bản")
-                st.write(df_tk["Loại văn bản"].value_counts())
+                csv = df_thang.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(f"📥 Tải BC tháng {thang_hien_tai}", data=csv, file_name=f"BC_{thang_hien_tai}.csv")
+            st.subheader("Thống kê theo cán bộ")
+            st.bar_chart(df_tk["Người thực hiện"].value_counts())
