@@ -32,7 +32,6 @@ if not os.path.exists(DATA_FILE):
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide")
 
-# --- QUẢN LÝ ĐĂNG NHẬP ---
 if "user_id" not in st.session_state:
     st.session_state["user_id"] = None
 
@@ -78,7 +77,18 @@ else:
 
             if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
                 df = pd.read_csv(DATA_FILE)
-                if not trich_yeu: st.error("Vui lòng nhập trích yếu.")
+                
+                # --- LOGIC KIỂM TRA TRÙNG TRÍCH YẾU CẢI TIẾN ---
+                trich_yeu_moi = trich_yeu.strip().lower()
+                # Kiểm tra trích yếu mới có nằm trong danh sách trích yếu cũ (đã chuẩn hóa) không
+                is_dup = df['Trích yếu'].apply(lambda x: str(x).strip().lower()).eq(trich_yeu_moi).any()
+
+                if not trich_yeu.strip():
+                    st.error("Vui lòng nhập trích yếu nội dung.")
+                elif is_dup and user_id != "admin":
+                    # Tìm số hiệu đã lấy của trích yếu này để thông báo cho người dùng
+                    so_da_co = df[df['Trích yếu'].apply(lambda x: str(x).strip().lower()) == trich_yeu_moi]['Số hiệu'].values[0]
+                    st.error(f"🚫 TRÙNG LẶP: Nội dung này đã được cấp số **{so_da_co}**. Vui lòng kiểm tra lại nhật ký!")
                 else:
                     if user_id == "admin" and is_chen and so_hieu_tuy_chinh: 
                         so_hieu_final = so_hieu_tuy_chinh
@@ -106,7 +116,7 @@ else:
     elif menu == "🔍 Nhật ký văn bản":
         st.subheader("🔍 Nhật ký văn bản")
         df_view = pd.read_csv(DATA_FILE)
-        search = st.text_input("Tìm kiếm nhanh...")
+        search = st.text_input("Tìm kiếm nhanh theo trích yếu hoặc số hiệu...")
         if search:
             df_view = df_view[df_view.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
         
