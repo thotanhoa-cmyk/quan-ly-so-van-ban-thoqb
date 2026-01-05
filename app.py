@@ -7,7 +7,6 @@ import os
 DATA_FILE = "data_so_van_ban.csv"
 MA_TRUONG = "THQOB"
 
-# 1. Cập nhật danh sách tài khoản: Bỏ "qob", mật khẩu là tên + 2026
 USERS_CONFIG = {
     "hao": ["hao2026", "Phạm Thị Hảo"],
     "tho": ["tho2026", "Phạm Xuân Thọ"],
@@ -57,7 +56,7 @@ else:
         st.session_state["user_id"] = None
         st.rerun()
 
-    # --- TAB 1: LẤY SỐ VAV BẢN ---
+    # --- TAB 1: LẤY SỐ VĂN BẢN ---
     if menu == "🚀 Lấy số văn bản":
         st.subheader("📝 Đăng ký cấp số mới")
         with st.form("form_cap_so"):
@@ -113,7 +112,11 @@ else:
                     "Tháng": ngay_van_ban.strftime("%m/%Y")
                 }
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                
+                # --- CẢI TIẾN: SẮP XẾP ĐA TẦNG ---
+                # Sắp xếp theo Loại văn bản (A-Z) rồi mới đến Số hiệu (A-Z)
                 df = df.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, True])
+                
                 df.to_csv(DATA_FILE, index=False)
                 st.success(f"✅ Đã cấp số: {so_hieu_final}")
                 st.balloons()
@@ -127,7 +130,9 @@ else:
             df_view = df_view[df_view.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
         
         if not df_view.empty:
+            # Luôn đảm bảo bảng hiển thị đúng nhóm Loại văn bản -> Số hiệu
             df_view = df_view.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, True])
+            
             df_display = df_view.copy()
             df_display.insert(0, 'STT', range(1, len(df_display) + 1))
             st.dataframe(df_display, use_container_width=True, hide_index=True)
@@ -138,7 +143,7 @@ else:
         if user_id == "admin" and not df_view.empty:
             st.divider()
             st.subheader("🛠 Quyền xóa của Admin")
-            id_to_del = st.text_input("Nhập Số hiệu muốn xóa:")
+            id_to_del = st.text_input("Nhập chính xác Số hiệu muốn xóa (Vd: 01a/BC-THQOB):")
             if st.button("❌ XÁC NHẬN XÓA"):
                 df_origin = pd.read_csv(DATA_FILE)
                 if id_to_del in df_origin["Số hiệu"].values:
@@ -148,16 +153,3 @@ else:
                     st.rerun()
                 else:
                     st.error("Không tìm thấy số hiệu này.")
-
-    # --- TAB 3: THỐNG KÊ ---
-    elif menu == "📊 Thống kê":
-        st.subheader("📊 Báo cáo tổng hợp")
-        df_tk = pd.read_csv(DATA_FILE)
-        if not df_tk.empty:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Thống kê theo người thực hiện:**")
-                st.bar_chart(df_tk["Người thực hiện"].value_counts())
-            with col2:
-                st.write("**Số lượng theo loại văn bản:**")
-                st.write(df_tk["Loại văn bản"].value_counts())
