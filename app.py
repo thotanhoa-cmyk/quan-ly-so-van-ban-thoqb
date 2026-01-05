@@ -9,12 +9,12 @@ MA_TRUONG = "THQOB"
 
 # 1. Cập nhật danh sách tài khoản (Đã đổi huongqob thành thuydo)
 USERS_CONFIG = {
-    "haophamqob": ["haophamqob2026", "Phạm Thị Hảo"],
-    "thophamqob": ["thophamqob2026", "Phạm Xuân Thọ"],
-    "thaonguyenqob": ["thaonguyenqob2026", "Nguyễn Thị Phương Thảo"],
-    "thaoleqob": ["thaoleqob2026", "Lê Thị Thảo"],
+    "haopham": ["haopham2026", "Phạm Thị Hảo"],
+    "thopham": ["thopham2026", "Phạm Xuân Thọ"],
+    "thaonguyen": ["thaonguyen2026", "Nguyễn Thị Phương Thảo"],
+    "thaole": ["thaole2026", "Lê Thị Thảo"],
     "thuydo": ["thuydo2026", "Đỗ Thị Thúy"], # Tài khoản mới cập nhật
-    "admin": ["adminqob2026", "Quản trị viên"]
+    "admin": ["admin2026", "Quản trị viên"]
 }
 
 LOAI_VB_DICT = {
