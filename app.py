@@ -78,12 +78,12 @@ else:
 
     # --- TAB 1: LẤY SỐ ---
     if menu == "🚀 Lấy số văn bản":
-        st.markdown("<h1>🚀 Đăng ký cấp số mới</h1>", unsafe_allow_html=True)
+        st.markdown("<h1>🚀 Đăng ký cấp số văn bản mới</h1>", unsafe_allow_html=True)
         with st.form("form_cap_so"):
             c1, c2 = st.columns(2)
             with c1:
                 loai_chon = st.selectbox("📁 Loại văn bản", list(LOAI_VB_DICT.keys()))
-                st.text_input("👤 Người thực hiện", value=user_name, disabled=True)
+                st.text_input("👤 Người thực hiện lấy số văn bản", value=user_name, disabled=True)
                 ngay_van_ban = st.date_input("📅 Ngày tháng văn bản", date.today())
             with c2:
                 nguoi_ky = st.selectbox("✍️ Người ký", DANH_SACH_NGUOI_KY)
