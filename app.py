@@ -7,7 +7,7 @@ import os
 DATA_FILE = "data_so_van_ban.csv"
 MA_TRUONG = "THQOB"
 # Link ảnh logo trường (Đã được chuyển hướng để hiển thị trực tiếp)
-LOGO_URL = "https://thttquocoaib-hanoi.edu.vn/uploads/thttquocoaib-hanoi/news/2021_12/logo_baiviet.jpg" 
+LOGO_URL = "http://truongtieuhocthitranquocoaib.edu.vn/upload/101647/20260105/ESTD2_5e92c.png" 
 
 USERS_CONFIG = {
     "hao": ["hao2026", "Phạm Thị Hảo"],
