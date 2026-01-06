@@ -17,12 +17,14 @@ DANH_SACH_CHUC_VU = ["Hiệu trưởng", "Phó Hiệu trưởng"]
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
 # --- KẾT NỐI SỬ DỤNG SECRETS ---
+# Thay thế phần conn cũ bằng dòng này:
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# Khi đọc dữ liệu, sử dụng lệnh này để tận dụng Secrets:
 @st.cache_data(ttl=5)
 def load_data_cached():
-    # Đọc dữ liệu từ Sheets sử dụng Secrets
-    df_vb = conn.read(spreadsheet=URL_DATA, worksheet="0")
+    # Hệ thống sẽ tự lấy spreadsheet từ Secrets nếu không điền URL vào đây
+    df_vb = conn.read(worksheet="0") 
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="0")
     return df_vb, df_us
 
