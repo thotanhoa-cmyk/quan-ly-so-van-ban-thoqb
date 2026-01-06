@@ -17,9 +17,11 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=600)
 def load_data_fast():
-    # Đọc bảng chính từ trang tính tên là Data
+    # Đọc dữ liệu và sắp xếp ngay từ đầu để đảm bảo tính thứ tự
     df_vb = conn.read(worksheet="Data")
-    # Đọc bảng tài khoản từ trang tính tên là Sheet1
+    # Sắp xếp theo Số hiệu để các số chèn (01a, 01b) nằm gần số gốc
+    if not df_vb.empty:
+        df_vb = df_vb.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, True])
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1")
     return df_vb, df_us
 
@@ -71,9 +73,9 @@ if df_vanban is not None and df_users is not None:
                     trich_yeu = st.text_area("📝 Trích yếu nội dung")
                 
                 if st.session_state.user_id == "admin":
-                    with st.expander("🛠 Admin chèn số"):
+                    with st.expander("🛠 Admin chèn số (Tùy chỉnh)"):
                         is_chen = st.checkbox("Kích hoạt chèn số")
-                        so_hieu_tuy_chinh = st.text_input("Số hiệu tùy chỉnh (Vd: 01a/BC-THQOB)")
+                        so_hieu_tuy_chinh = st.text_input("Nhập số hiệu mong muốn (Ví dụ: 01a/BC-THQOB)")
 
                 if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
                     if not trich_yeu.strip():
@@ -85,7 +87,9 @@ if df_vanban is not None and df_users is not None:
                         if st.session_state.user_id == "admin" and is_chen and so_hieu_tuy_chinh:
                             so_hieu_final = so_hieu_tuy_chinh
                         else:
-                            so_moi = len(df_vanban[df_vanban["Loại văn bản"] == loai_chon]) + 1
+                            # Tự động lấy số tiếp theo
+                            df_loai = df_vanban[df_vanban["Loại văn bản"] == loai_chon]
+                            so_moi = len(df_loai) + 1
                             so_hieu_final = f"{so_moi:02d}/{ky_hieu}-{MA_TRUONG}"
                         
                         new_row = pd.DataFrame([{
@@ -94,50 +98,51 @@ if df_vanban is not None and df_users is not None:
                             "Người ký": nguoi_ky, "Chức vụ": chuc_vu, "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                         }])
                         
-                        # Ghi dữ liệu và xóa cache
-                        conn.update(worksheet="Data", data=pd.concat([df_vanban, new_row], ignore_index=True))
+                        # Ghi dữ liệu
+                        updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
+                        conn.update(worksheet="Data", data=updated_df)
                         st.cache_data.clear()
                         st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
                         st.rerun()
 
-            # --- BẢNG RIÊNG THEO TỪNG LOẠI VĂN BẢN ---
+            # --- BẢNG TRA CỨU PHÂN LOẠI (CÓ SẮP XẾP SỐ CHÈN) ---
             st.divider()
-            st.subheader("📑 Tra cứu số hiệu đã cấp")
+            st.subheader("📑 Tra cứu nhanh theo loại")
             tab_names = ["Tất cả"] + DANH_SACH_LOAI
             tabs = st.tabs(tab_names)
             
             for i, tab in enumerate(tabs):
                 with tab:
                     if tab_names[i] == "Tất cả":
+                        # Hiển thị 10 dòng mới nhất theo thời gian tạo
                         df_tab = df_vanban.tail(10)[::-1]
-                        st.write("**10 số hiệu vừa cấp gần nhất (Mọi loại)**")
                     else:
-                        df_tab = df_vanban[df_vanban["Loại văn bản"] == tab_names[i]].tail(5)[::-1]
-                        st.write(f"**5 số hiệu {tab_names[i]} gần nhất**")
+                        # Lọc theo loại và SẮP XẾP theo Số hiệu để số chèn (01a) đứng cạnh số gốc (01)
+                        df_tab = df_vanban[df_vanban["Loại văn bản"] == tab_names[i]].sort_values(by="Số hiệu", ascending=False)
                     
                     if not df_tab.empty:
-                        st.table(df_tab[["Số hiệu", "Ngày văn bản", "Trích yếu", "Người ký"]])
+                        st.table(df_tab[["Số hiệu", "Ngày văn bản", "Trích yếu", "Người ký"]].head(10))
                     else:
-                        st.info(f"Chưa có dữ liệu cho mục {tab_names[i]}.")
+                        st.info(f"Chưa có dữ liệu cho {tab_names[i]}.")
 
         # --- 2. NHẬT KÝ & QUẢN LÝ ---
         elif menu == "🔍 Nhật ký & Quản lý":
             st.header("🔍 Nhật ký văn bản (Toàn bộ)")
-            search = st.text_input("🔍 Tìm kiếm văn bản...")
-            df_display = df_vanban.copy()
+            search = st.text_input("🔍 Tìm kiếm theo nội dung, số hiệu...")
+            # Sắp xếp toàn bộ dữ liệu theo Số hiệu để Admin dễ quản lý các số chèn
+            df_display = df_vanban.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, False])
             if search:
-                # Lọc dữ liệu dựa trên từ khóa tìm kiếm
                 df_display = df_display[df_display.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
-            st.dataframe(df_display[::-1], use_container_width=True, hide_index=True)
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
 
         # --- 3. BÁO CÁO THÁNG ---
         elif menu == "📊 Báo cáo tháng":
             st.header("📊 Báo cáo quản trị")
             if not df_vanban.empty:
                 list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
-                thang_sel = st.selectbox("Chọn tháng báo cáo:", list_thang)
+                thang_sel = st.selectbox("Chọn tháng:", list_thang)
                 df_th = df_vanban[df_vanban["Tháng"] == thang_sel]
-                st.metric(f"Tổng văn bản tháng {thang_sel}", len(df_th))
+                st.metric(f"Văn bản tháng {thang_sel}", len(df_th))
                 st.dataframe(df_th, use_container_width=True, hide_index=True)
                 csv = df_th.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 Tải báo cáo Excel", data=csv, file_name=f"BC_{thang_sel}.csv")
@@ -145,14 +150,13 @@ if df_vanban is not None and df_users is not None:
         # --- 4. QUẢN TRỊ ADMIN ---
         elif menu == "⚙️ Quản trị Admin":
             if st.session_state.user_id == "admin":
-                st.header("⚙️ Quản lý tài khoản")
-                st.dataframe(df_users, hide_index=True)
-                st.divider()
-                u_sel = st.selectbox("Chọn tài khoản reset:", df_users['Username'].tolist())
+                st.header("⚙️ Quản lý hệ thống")
+                st.subheader("🔑 Đổi mật khẩu")
+                u_sel = st.selectbox("Chọn tài khoản:", df_users['Username'].tolist())
                 p_new = st.text_input("Mật khẩu mới:", type="password")
-                if st.button("Cập nhật mật khẩu"):
+                if st.button("Cập nhật"):
                     df_users.loc[df_users['Username'] == u_sel, 'Password'] = p_new
                     conn.update(spreadsheet=URL_USERS, worksheet="Sheet1", data=df_users)
-                    st.success(f"Đã đổi mật khẩu cho {u_sel} thành công!")
+                    st.success(f"Đã đổi mật khẩu cho {u_sel}!")
             else:
-                st.warning("Bạn không có quyền truy cập mục này.")
+                st.warning("Bạn không có quyền truy cập.")
