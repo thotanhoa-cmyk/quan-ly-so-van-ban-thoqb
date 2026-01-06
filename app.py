@@ -8,29 +8,24 @@ MA_TRUONG = "THQOB"
 LOGO_URL = "ESTD2.png"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
 WEB_URL = "https://sovanbandiqob.streamlit.app/"
+DANH_SACH_LOAI = ["Công văn", "Quyết định", "Tờ trình", "Thông báo", "Báo cáo", "Giấy mời", "Biên bản", "Kế hoạch", "Hợp đồng", "Quy chế"]
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
 # --- KẾT NỐI TỐI ƯU ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Tăng thời gian ttl (Time To Live) lên 600 giây (10 phút) để load cực nhanh
 @st.cache_data(ttl=600)
 def load_data_fast():
-    # Đọc bảng chính
     df_vb = conn.read(worksheet="Data")
-    # Đọc bảng tài khoản
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1")
     return df_vb, df_us
 
-# Hàm này dùng để ép buộc tải lại dữ liệu mới nhất khi vừa nhấn nút "Xác nhận"
-def refresh_data():
-    st.cache_data.clear()
-    return load_data_fast()
-
 df_vanban, df_users = load_data_fast()
 
-# --- GIAO DIỆN & LOGIC ---
+# --- CSS GIAO DIỆN ---
+st.markdown("""<style>.main { background-color: #f0f2f6; } .stButton>button { border-radius: 8px; font-weight: bold; background-color: #1e3a8a; color: white; }</style>""", unsafe_allow_html=True)
+
 if df_vanban is not None and df_users is not None:
     if "user_id" not in st.session_state:
         st.session_state["user_id"] = None
@@ -60,12 +55,13 @@ if df_vanban is not None and df_users is not None:
                 st.session_state["user_id"] = None
                 st.rerun()
 
+        # --- 1. CẤP SỐ VĂN BẢN ---
         if menu == "🚀 Cấp số văn bản":
             st.header("🚀 Cấp số văn bản mới")
             with st.form("form_cap_so"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    loai_chon = st.selectbox("📁 Loại văn bản", ["Công văn", "Quyết định", "Tờ trình", "Thông báo", "Báo cáo", "Giấy mời", "Biên bản", "Kế hoạch", "Hợp đồng", "Quy chế"])
+                    loai_chon = st.selectbox("📁 Loại văn bản", DANH_SACH_LOAI)
                     ngay_vb = st.date_input("📅 Ngày văn bản", date.today())
                     nguoi_ky = st.selectbox("✍️ Người ký", ["Phạm Thị Hảo", "Nguyễn Thị Phương Thảo"])
                 with c2:
@@ -96,22 +92,35 @@ if df_vanban is not None and df_users is not None:
                             "Người ký": nguoi_ky, "Chức vụ": chuc_vu, "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                         }])
                         
-                        # GHI DỮ LIỆU & XÓA CACHE ĐỂ CẬP NHẬT MỚI
-                        updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
-                        conn.update(worksheet="Data", data=updated_df)
-                        st.cache_data.clear() # Làm mới bộ nhớ đệm
+                        conn.update(worksheet="Data", data=pd.concat([df_vanban, new_row], ignore_index=True))
+                        st.cache_data.clear()
                         st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
                         st.rerun()
 
-        elif menu == "🔍 Nhật ký & Quản lý":
-            st.header("🔍 Nhật ký văn bản")
-            # Hiển thị 50 dòng mới nhất để load nhanh hơn
-            st.dataframe(df_vanban.tail(50), use_container_width=True, hide_index=True)
+            # --- BẢNG RIÊNG THEO TỪNG LOẠI VĂN BẢN ---
+            st.divider()
+            st.subheader("📑 Tra cứu số hiệu đã cấp")
+            
+            # Tạo danh sách các tab: Tab đầu là Tất cả, sau đó là từng loại văn bản
+            tab_names = ["Tất cả"] + DANH_SACH_LOAI
+            tabs = st.tabs(tab_names)
+            
+            for i, tab in enumerate(tabs):
+                with tab:
+                    if tab_names[i] == "Tất cả":
+                        df_tab = df_vanban.tail(10)[::-1]
+                        title = "10 số hiệu vừa cấp gần nhất (Mọi loại)"
+                    else:
+                        df_tab = df_vanban[df_vanban["Loại văn bản"] == tab_names[i]].tail(5)[::-1]
+                        title = f"5 số hiệu {tab_names[i]} gần nhất"
+                    
+                    if not df_tab.empty:
+                        st.write(f"**{title}**")
+                        st.table(df_tab[["Số hiệu", "Ngày văn bản", "Trích yếu", "Người ký"]])
+                    else:
+                        st.info(f"Chưa có dữ liệu cho mục {tab_names[i]}.")
 
-        elif menu == "📊 Báo cáo tháng":
-            st.header("📊 Báo cáo")
-            if not df_vanban.empty:
-                list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
-                thang_sel = st.selectbox("Chọn tháng:", list_thang)
-                df_th = df_vanban[df_vanban["Tháng"] == thang_sel]
-                st.dataframe(df_th, use_container_width=True, hide_index=True)
+        # --- 2. NHẬT KÝ & QUẢN LÝ (GIỮ NGUYÊN) ---
+        elif menu == "🔍 Nhật ký & Quản lý":
+            st.header("🔍 Nhật ký văn bản (Toàn bộ)")
+            search = st.text_input("🔍
