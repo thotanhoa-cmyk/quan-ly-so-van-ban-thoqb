@@ -11,27 +11,27 @@ WEB_URL = "https://sovanbandiqob.streamlit.app/"
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
-# --- KẾT NỐI ---
+# --- KẾT NỐI TỐI ƯU ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-def load_data():
-    try:
-        # Đọc bảng chính - BẮT BUỘC TRANG TÍNH TÊN LÀ: Data
-        df_vb = conn.read(worksheet="Data", ttl=0)
-        # Đọc bảng tài khoản - BẮT BUỘC TRANG TÍNH TÊN LÀ: Sheet1
-        df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1", ttl=0)
-        return df_vb, df_us
-    except Exception as e:
-        st.error(f"Lỗi: Không tìm thấy trang tính phù hợp. Chi tiết: {e}")
-        return None, None
+# Tăng thời gian ttl (Time To Live) lên 600 giây (10 phút) để load cực nhanh
+@st.cache_data(ttl=600)
+def load_data_fast():
+    # Đọc bảng chính
+    df_vb = conn.read(worksheet="Data")
+    # Đọc bảng tài khoản
+    df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1")
+    return df_vb, df_us
 
-df_vanban, df_users = load_data()
+# Hàm này dùng để ép buộc tải lại dữ liệu mới nhất khi vừa nhấn nút "Xác nhận"
+def refresh_data():
+    st.cache_data.clear()
+    return load_data_fast()
 
-# --- CSS ---
-st.markdown("""<style>.main { background-color: #f0f2f6; } .stButton>button { border-radius: 8px; font-weight: bold; background-color: #1e3a8a; color: white; }</style>""", unsafe_allow_html=True)
+df_vanban, df_users = load_data_fast()
 
+# --- GIAO DIỆN & LOGIC ---
 if df_vanban is not None and df_users is not None:
-    # --- ĐĂNG NHẬP ---
     if "user_id" not in st.session_state:
         st.session_state["user_id"] = None
 
@@ -51,13 +51,9 @@ if df_vanban is not None and df_users is not None:
                     st.rerun()
                 else: st.error("Sai tài khoản hoặc mật khẩu!")
     else:
-        # --- GIAO DIỆN CHÍNH ---
         with st.sidebar:
             st.image(LOGO_URL, width=80)
             st.info(f"Cán bộ: **{st.session_state.user_name}**")
-            st.divider()
-            st.markdown("<p style='text-align: center;'>📷 QR TRUY CẬP</p>", unsafe_allow_html=True)
-            st.image(f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={WEB_URL}")
             st.divider()
             menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
             if st.button("🚪 Đăng xuất"):
@@ -78,8 +74,8 @@ if df_vanban is not None and df_users is not None:
                 
                 if st.session_state.user_id == "admin":
                     with st.expander("🛠 Admin chèn số"):
-                        is_chen = st.checkbox("Kích hoạt chèn số tùy chỉnh")
-                        so_hieu_tuy_chinh = st.text_input("Số hiệu tùy chỉnh (Vd: 01a/BC-THQOB)")
+                        is_chen = st.checkbox("Kích hoạt chèn số")
+                        so_hieu_tuy_chinh = st.text_input("Số hiệu tùy chỉnh")
 
                 if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
                     if not trich_yeu.strip():
@@ -100,27 +96,17 @@ if df_vanban is not None and df_users is not None:
                             "Người ký": nguoi_ky, "Chức vụ": chuc_vu, "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                         }])
                         
-                        try:
-                            updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
-                            conn.update(worksheet="Data", data=updated_df)
-                            st.cache_data.clear()
-                            st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
-                            st.balloons()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Lỗi khi lưu dữ liệu: {e}")
+                        # GHI DỮ LIỆU & XÓA CACHE ĐỂ CẬP NHẬT MỚI
+                        updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
+                        conn.update(worksheet="Data", data=updated_df)
+                        st.cache_data.clear() # Làm mới bộ nhớ đệm
+                        st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
+                        st.rerun()
 
         elif menu == "🔍 Nhật ký & Quản lý":
             st.header("🔍 Nhật ký văn bản")
-            st.dataframe(df_vanban, use_container_width=True, hide_index=True)
-            if st.session_state.user_id == "admin":
-                st.divider()
-                so_xoa = st.text_input("Nhập số hiệu chính xác để xóa:")
-                if st.button("Xóa dòng này"):
-                    df_new = df_vanban[df_vanban["Số hiệu"] != so_xoa]
-                    conn.update(worksheet="Data", data=df_new)
-                    st.cache_data.clear()
-                    st.rerun()
+            # Hiển thị 50 dòng mới nhất để load nhanh hơn
+            st.dataframe(df_vanban.tail(50), use_container_width=True, hide_index=True)
 
         elif menu == "📊 Báo cáo tháng":
             st.header("📊 Báo cáo")
@@ -129,16 +115,3 @@ if df_vanban is not None and df_users is not None:
                 thang_sel = st.selectbox("Chọn tháng:", list_thang)
                 df_th = df_vanban[df_vanban["Tháng"] == thang_sel]
                 st.dataframe(df_th, use_container_width=True, hide_index=True)
-                csv = df_th.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 Tải báo cáo Excel", data=csv, file_name=f"BC_{thang_sel}.csv")
-
-        elif menu == "⚙️ Quản trị Admin":
-            if st.session_state.user_id == "admin":
-                st.header("⚙️ Quản lý tài khoản")
-                st.dataframe(df_users, hide_index=True)
-                u_sel = st.selectbox("Chọn tài khoản:", df_users['Username'].tolist())
-                p_new = st.text_input("Mật khẩu mới:", type="password")
-                if st.button("Cập nhật mật khẩu"):
-                    df_users.loc[df_users['Username'] == u_sel, 'Password'] = p_new
-                    conn.update(spreadsheet=URL_USERS, worksheet="Sheet1", data=df_users)
-                    st.success("Đã đổi mật khẩu!")
