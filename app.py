@@ -11,22 +11,24 @@ WEB_URL = "https://sovanbandiqob.streamlit.app/"
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
-# --- KẾT NỐI SERVICE ACCOUNT ---
+# --- KẾT NỐI ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
-    # Đọc bảng chính dùng Service Account cấu hình trong Secrets
-    df_vb = conn.read(worksheet="0", ttl=0)
-    # Đọc bảng tài khoản (dùng URL vì bảng này chỉ cần ĐỌC)
-    df_us = conn.read(spreadsheet=URL_USERS, worksheet="0", ttl=0)
+    # Đọc bảng chính bằng Service Account (Worksheet tên là Data)
+    df_vb = conn.read(worksheet="Data", ttl=0)
+    # Đọc bảng tài khoản bằng URL
+    df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1", ttl=0)
     return df_vb, df_us
 
-df_vanban, df_users = load_data()
+try:
+    df_vanban, df_users = load_data()
+except Exception as e:
+    st.error(f"Lỗi kết nối: {e}")
+    st.info("Hãy đảm bảo bạn đã đổi tên trang tính trong Google Sheets thành 'Data'.")
+    st.stop()
 
-# --- CSS GIAO DIỆN ---
-st.markdown("""<style>.main { background-color: #f0f2f6; } .stButton>button { border-radius: 8px; font-weight: bold; background-color: #1e3a8a; color: white; }</style>""", unsafe_allow_html=True)
-
-# --- ĐĂNG NHẬP ---
+# --- GIAO DIỆN ĐĂNG NHẬP (Giữ nguyên phần cũ) ---
 if "user_id" not in st.session_state:
     st.session_state["user_id"] = None
 
@@ -46,19 +48,16 @@ if st.session_state["user_id"] is None:
                 st.rerun()
             else: st.error("Sai tài khoản hoặc mật khẩu!")
 else:
-    # Sidebar
+    # Sidebar và các menu
     with st.sidebar:
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
         st.divider()
-        st.markdown("<p style='text-align: center;'>📷 QR TRUY CẬP</p>", unsafe_allow_html=True)
-        st.image(f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={WEB_URL}", use_container_width=True)
-        st.divider()
-        menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
+        menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng"])
         if st.button("🚪 Đăng xuất"):
             st.session_state["user_id"] = None
             st.rerun()
 
-    # 1. CẤP SỐ VĂN BẢN
+    # XỬ LÝ CẤP SỐ
     if menu == "🚀 Cấp số văn bản":
         st.header("🚀 Cấp số văn bản mới")
         with st.form("form_cap_so"):
@@ -81,22 +80,13 @@ else:
                         "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                     }])
                     
-                    # GHI DỮ LIỆU BẰNG SERVICE ACCOUNT
+                    # GHI DỮ LIỆU
                     updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
-                    conn.update(data=updated_df)
+                    conn.update(worksheet="Data", data=updated_df)
                     st.cache_data.clear()
                     st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu}")
                     st.balloons()
                     st.rerun()
 
-    # 2. NHẬT KÝ
     elif menu == "🔍 Nhật ký & Quản lý":
-        st.header("🔍 Nhật ký lưu trữ")
         st.dataframe(df_vanban, use_container_width=True, hide_index=True)
-
-    # 3. BÁO CÁO
-    elif menu == "📊 Báo cáo tháng":
-        if not df_vanban.empty:
-            list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
-            thang = st.selectbox("Chọn tháng:", list_thang)
-            st.dataframe(df_vanban[df_vanban["Tháng"] == thang], use_container_width=True)
