@@ -9,6 +9,7 @@ MA_TRUONG = "THQOB"
 LOGO_URL = "ESTD2.png" 
 URL_DATA = "https://docs.google.com/spreadsheets/d/1VQZ4uFtvb0Ur4livO5qPy5HGRntETgUOjnGpfgqDXtc/edit?usp=sharing"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
+WEB_URL = "https://sovanbandiqob.streamlit.app/"
 
 LOAI_VB_DICT = {"Công văn": "CV", "Quyết định": "QĐ", "Tờ trình": "TTr", "Thông báo": "TB", "Báo cáo": "BC", "Giấy mời": "GM", "Biên bản": "BB", "Kế hoạch": "KH", "Hợp đồng": "HĐ", "Quy chế": "QC"}
 DANH_SACH_NGUOI_KY = ["Phạm Thị Hảo", "Nguyễn Thị Phương Thảo"]
@@ -19,7 +20,7 @@ st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout=
 # --- KẾT NỐI DỮ LIỆU TỐI ƯU ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=10) # Dữ liệu sẽ được làm mới sau mỗi 10 giây nếu có thay đổi
 def load_data_cached():
     df_vb = conn.read(spreadsheet=URL_DATA, worksheet="0")
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="0")
@@ -54,28 +55,15 @@ else:
         try: st.image(LOGO_URL, width=100)
         except: pass
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
-        # Tìm đoạn này trong file app.py của bạn:
-    with st.sidebar:
-        try: 
-            st.image(LOGO_URL, width=100)
-        except: 
-            pass
-        st.info(f"Cán bộ: **{st.session_state.user_name}**")
-                # --- ĐOẠN MÃ QR MỚI CHÈN VÀO ĐÂY ---
+        
+        # --- CHÈN MÃ QR CODE TỰ ĐỘNG TẠI ĐÂY ---
         st.divider()
         st.markdown("<p style='text-align: center; font-weight: bold;'>📷 QUÉT QR TRÊN DI ĐỘNG</p>", unsafe_allow_html=True)
-        
-        # Link tạo mã QR tự động
-        qr_link = "https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=https://sovanbandiqob.streamlit.app/"
-        st.image(qr_link, caption="Mở Zalo để quét mã", use_container_width=True)
+        # Sử dụng API tạo QR ổn định từ Google
+        qr_api = f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={WEB_URL}"
+        st.image(qr_api, caption="Mở Zalo quét để truy cập nhanh", use_container_width=True)
         st.divider()
-        # --- HẾT ĐOẠN QR ---
-
-        menu = st.radio("CHỨC NĂNG", ["🚀 Lấy số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
-        if st.button("🚪 Đăng xuất"):
-            st.session_state["user_id"] = None
-            st.rerun()
-            st.divider()
+        
         menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
         if st.button("🚪 Đăng xuất"):
             st.session_state["user_id"] = None
@@ -142,7 +130,7 @@ else:
                 st.success("Đã xóa!")
                 st.rerun()
 
-    # 3. BÁO CÁO THÁNG (ĐÃ PHỤC HỒI)
+    # 3. BÁO CÁO THÁNG
     elif menu == "📊 Báo cáo tháng":
         st.markdown("<h1>📊 Báo cáo quản trị</h1>", unsafe_allow_html=True)
         if not df_vanban.empty:
@@ -159,7 +147,7 @@ else:
         else:
             st.info("Chưa có dữ liệu.")
 
-    # 4. QUẢN TRỊ ADMIN (ĐÃ PHỤC HỒI)
+    # 4. QUẢN TRỊ ADMIN
     elif menu == "⚙️ Quản trị Admin":
         if st.session_state.user_id == "admin":
             st.markdown("<h1>⚙️ Quản lý tài khoản</h1>", unsafe_allow_html=True)
