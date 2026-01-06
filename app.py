@@ -10,7 +10,7 @@ LOGO_URL = "http://truongtieuhocthitranquocoaib.edu.vn/upload/101647/20260105/ES
 
 USERS_CONFIG = {
     "hao": ["hao2026", "Phạm Thị Hảo"],
-    "tho": ["tho2026", "Phạm Xuân Thọ"],
+    "thopham": ["thopham2026", "Phạm Xuân Thọ"],
     "thaonguyen": ["thaonguyen2026", "Nguyễn Thị Phương Thảo"],
     "thaole": ["thaole2026", "Lê Thị Thảo"],
     "thuy": ["thuy2026", "Đỗ Thị Thúy"],
