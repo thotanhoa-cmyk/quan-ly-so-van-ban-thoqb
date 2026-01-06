@@ -5,34 +5,24 @@ from datetime import datetime, date
 
 # --- CẤU HÌNH ---
 MA_TRUONG = "THQOB"
-LOGO_URL = "ESTD2.png" 
-# Link gốc để đọc dữ liệu dự phòng
+LOGO_URL = "https://i.postimg.cc/mD83m8Yn/logo-edu.png" 
 URL_DATA = "https://docs.google.com/spreadsheets/d/1VQZ4uFtvb0Ur4livO5qPy5HGRntETgUOjnGpfgqDXtc/edit?usp=sharing"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
 WEB_URL = "https://sovanbandiqob.streamlit.app/"
 
-LOAI_VB_DICT = {"Công văn": "CV", "Quyết định": "QĐ", "Tờ trình": "TTr", "Thông báo": "TB", "Báo cáo": "BC", "Giấy mời": "GM", "Biên bản": "BB", "Kế hoạch": "KH", "Hợp đồng": "HĐ", "Quy chế": "QC"}
-DANH_SACH_NGUOI_KY = ["Phạm Thị Hảo", "Nguyễn Thị Phương Thảo"]
-DANH_SACH_CHUC_VU = ["Hiệu trưởng", "Phó Hiệu trưởng"]
-
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
-# --- KẾT NỐI (ƯU TIÊN SECRETS) ---
-# Lệnh này sẽ tự động tìm cấu hình [connections.gsheets] trong Secrets để cấp quyền GHI
+# --- KẾT NỐI ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=2)
 def load_data_cached():
-    # Đọc bảng chính từ Secrets (mặc định)
-    df_vb = conn.read(worksheet="0")
-    # Đọc bảng tài khoản
+    # Đọc dữ liệu bằng URL trực tiếp để tránh lỗi đồng bộ
+    df_vb = conn.read(spreadsheet=URL_DATA, worksheet="0")
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="0")
     return df_vb, df_us
 
 df_vanban, df_users = load_data_cached()
-
-# --- GIAO DIỆN ---
-st.markdown("""<style>.main { background-color: #f0f2f6; } .stButton>button { border-radius: 8px; font-weight: bold; background-color: #1e3a8a; color: white; }</style>""", unsafe_allow_html=True)
 
 # --- ĐĂNG NHẬP ---
 if "user_id" not in st.session_state:
@@ -43,7 +33,7 @@ if st.session_state["user_id"] is None:
     with col_m:
         try: st.image(LOGO_URL, width=150)
         except: pass
-        st.markdown("<h1 style='text-align: center;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
         u_input = st.text_input("👤 Tên đăng nhập")
         p_input = st.text_input("🔑 Mật khẩu", type="password")
         if st.button("ĐĂNG NHẬP"):
@@ -69,81 +59,45 @@ else:
     if menu == "🚀 Cấp số văn bản":
         st.header("🚀 Cấp số văn bản mới")
         with st.form("form_cap_so"):
-            c1, c2 = st.columns(2)
-            with c1:
-                loai_chon = st.selectbox("📁 Loại văn bản", list(LOAI_VB_DICT.keys()))
-                ngay_van_ban = st.date_input("📅 Ngày tháng", date.today())
-                nguoi_ky = st.selectbox("✍️ Người ký", DANH_SACH_NGUOI_KY)
-            with c2:
-                chuc_vu = st.selectbox("🎓 Chức vụ", DANH_SACH_CHUC_VU)
-                trich_yeu = st.text_area("📝 Trích yếu")
+            loai_chon = st.selectbox("📁 Loại văn bản", ["Công văn", "Quyết định", "Tờ trình", "Thông báo", "Báo cáo", "Giấy mời", "Biên bản", "Kế hoạch", "Hợp đồng", "Quy chế"])
+            trich_yeu = st.text_area("📝 Trích yếu nội dung")
+            ngay_vb = st.date_input("📅 Ngày văn bản", date.today())
             
-            if st.session_state.user_id == "admin":
-                with st.expander("🛠 Admin chèn số"):
-                    is_chen = st.checkbox("Kích hoạt")
-                    so_hieu_tuy_chinh = st.text_input("Số hiệu tùy chỉnh")
-
-            if st.form_submit_button("🔥 XÁC NHẬN"):
+            if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
                 if not trich_yeu.strip():
                     st.error("Vui lòng nhập trích yếu!")
                 else:
-                    ky_hieu = LOAI_VB_DICT[loai_chon]
+                    # Logic lấy số
+                    ky_hieu_dict = {"Công văn": "CV", "Quyết định": "QĐ", "Tờ trình": "TTr", "Thông báo": "TB", "Báo cáo": "BC", "Giấy mời": "GM", "Biên bản": "BB", "Kế hoạch": "KH", "Hợp đồng": "HĐ", "Quy chế": "QC"}
+                    ky_hieu = ky_hieu_dict[loai_chon]
                     so_moi = len(df_vanban[df_vanban["Loại văn bản"] == loai_chon]) + 1
-                    so_hieu = so_hieu_tuy_chinh if (st.session_state.user_id == "admin" and is_chen) else f"{so_moi:02d}/{ky_hieu}-{MA_TRUONG}"
+                    so_hieu = f"{so_moi:02d}/{ky_hieu}-{MA_TRUONG}"
                     
-                    new_data = pd.DataFrame([{
-                        "Loại văn bản": loai_chon, "Số hiệu": so_hieu, "Ngày văn bản": ngay_van_ban.strftime("%d/%m/%Y"),
+                    new_row = pd.DataFrame([{
+                        "Loại văn bản": loai_chon, "Số hiệu": so_hieu, "Ngày văn bản": ngay_vb.strftime("%d/%m/%Y"),
                         "Trích yếu": trich_yeu.strip(), "Người thực hiện": st.session_state.user_name,
-                        "Người ký": nguoi_ky, "Chức vụ": chuc_vu, "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "Tháng": ngay_van_ban.strftime("%m/%Y")
+                        "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                     }])
                     
                     try:
-                        updated_df = pd.concat([df_vanban, new_data], ignore_index=True)
-                        # GHI DỮ LIỆU: Hệ thống sẽ tự dùng Secrets để xác thực Editor
-                        conn.update(data=updated_df)
+                        # Cập nhật dữ liệu
+                        updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
+                        # SỬ DỤNG PHƯƠNG THỨC CẬP NHẬT CƯỠNG ÉP
+                        conn.update(spreadsheet=URL_DATA, data=updated_df)
                         st.cache_data.clear()
                         st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu}")
                         st.balloons()
                     except Exception as e:
-                        st.error(f"Lỗi quyền ghi: {e}")
-                        st.info("Kiểm tra lại Secrets phải nằm trên 1 dòng duy nhất.")
+                        st.error("Hệ thống vẫn chặn quyền ghi.")
+                        st.info("Vui lòng kiểm tra lại file Google Sheet: Nút Chia sẻ -> Bất kỳ ai có link -> Phải chọn là 'Người chỉnh sửa'.")
 
-    # 2. NHẬT KÝ & XÓA
+    # 2. NHẬT KÝ
     elif menu == "🔍 Nhật ký & Quản lý":
-        st.header("🔍 Nhật ký văn bản")
         st.dataframe(df_vanban, use_container_width=True, hide_index=True)
-        if st.session_state.user_id == "admin":
-            st.divider()
-            so_xoa = st.text_input("Nhập số hiệu chính xác để xóa:")
-            if st.button("Xóa số này"):
-                df_new = df_vanban[df_vanban["Số hiệu"] != so_xoa]
-                conn.update(data=df_new)
-                st.cache_data.clear()
-                st.success("Đã xóa!")
-                st.rerun()
 
-    # 3. BÁO CÁO THÁNG
+    # 3. BÁO CÁO
     elif menu == "📊 Báo cáo tháng":
-        st.header("📊 Báo cáo quản trị")
         if not df_vanban.empty:
             list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
             thang = st.selectbox("Chọn tháng:", list_thang)
-            df_th = df_vanban[df_vanban["Tháng"] == thang]
-            st.metric("Số lượng văn bản", len(df_th))
-            st.dataframe(df_th, use_container_width=True, hide_index=True)
-            csv = df_th.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 Tải báo cáo tháng", data=csv, file_name=f"BC_{thang}.csv")
-
-    # 4. ADMIN RESET MẬT KHẨU
-    elif menu == "⚙️ Quản trị Admin":
-        if st.session_state.user_id == "admin":
-            st.header("⚙️ Quản lý tài khoản")
-            st.dataframe(df_users, hide_index=True)
-            u_sel = st.selectbox("Chọn tài khoản:", df_users['Username'].tolist())
-            p_new = st.text_input("Mật khẩu mới:", type="password")
-            if st.button("Cập nhật mật khẩu"):
-                df_users.loc[df_users['Username'] == u_sel, 'Password'] = p_new
-                # Ghi mật khẩu mới vào file Users
-                conn.update(spreadsheet=URL_USERS, data=df_users)
-                st.success(f"Đã đổi mật khẩu cho {u_sel}!")
+            st.dataframe(df_vanban[df_vanban["Tháng"] == thang], use_container_width=True)
