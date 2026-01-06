@@ -54,7 +54,28 @@ else:
         try: st.image(LOGO_URL, width=100)
         except: pass
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
+        # Tìm đoạn này trong file app.py của bạn:
+    with st.sidebar:
+        try: 
+            st.image(LOGO_URL, width=100)
+        except: 
+            pass
+        st.info(f"Cán bộ: **{st.session_state.user_name}**")
+                # --- ĐOẠN MÃ QR MỚI CHÈN VÀO ĐÂY ---
         st.divider()
+        st.markdown("<p style='text-align: center; font-weight: bold;'>📷 QUÉT QR TRÊN DI ĐỘNG</p>", unsafe_allow_html=True)
+        
+        # Link tạo mã QR tự động
+        qr_link = "https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=https://sovanbandiqob.streamlit.app/"
+        st.image(qr_link, caption="Mở Zalo để quét mã", use_container_width=True)
+        st.divider()
+        # --- HẾT ĐOẠN QR ---
+
+        menu = st.radio("CHỨC NĂNG", ["🚀 Lấy số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
+        if st.button("🚪 Đăng xuất"):
+            st.session_state["user_id"] = None
+            st.rerun()
+            st.divider()
         menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
         if st.button("🚪 Đăng xuất"):
             st.session_state["user_id"] = None
