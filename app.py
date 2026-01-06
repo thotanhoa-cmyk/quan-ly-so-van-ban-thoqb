@@ -5,7 +5,7 @@ from datetime import datetime, date
 
 # --- CẤU HÌNH ---
 MA_TRUONG = "THQOB"
-LOGO_URL = ""
+LOGO_URL = "ESTD2.png"
 URL_DATA = "https://docs.google.com/spreadsheets/d/1VQZ4uFtvb0Ur4livO5qPy5HGRntETgUOjnGpfgqDXtc/edit?usp=sharing"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
 
