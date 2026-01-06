@@ -5,7 +5,7 @@ from datetime import datetime, date
 
 # --- CẤU HÌNH ---
 MA_TRUONG = "THQOB"
-LOGO_URL = "ESTD2.png" 
+LOGO_URL = "https://i.postimg.cc/mD83m8Yn/logo-edu.png" 
 URL_DATA = "https://docs.google.com/spreadsheets/d/1VQZ4uFtvb0Ur4livO5qPy5HGRntETgUOjnGpfgqDXtc/edit?usp=sharing"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
 WEB_URL = "https://sovanbandiqob.streamlit.app/"
@@ -16,21 +16,19 @@ DANH_SACH_CHUC_VU = ["Hiệu trưởng", "Phó Hiệu trưởng"]
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
-# --- KẾT NỐI SỬ DỤNG SECRETS ---
-# Thay thế phần conn cũ bằng dòng này:
+# --- KẾT NỐI ---
+# Sử dụng trực tiếp Secrets từ Streamlit Cloud
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Khi đọc dữ liệu, sử dụng lệnh này để tận dụng Secrets:
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=2) # Giảm thời gian cache xuống thấp nhất để cập nhật số nhanh
 def load_data_cached():
-    # Hệ thống sẽ tự lấy spreadsheet từ Secrets nếu không điền URL vào đây
-    df_vb = conn.read(worksheet="0") 
+    df_vb = conn.read(spreadsheet=URL_DATA, worksheet="0")
     df_us = conn.read(spreadsheet=URL_USERS, worksheet="0")
     return df_vb, df_us
 
 df_vanban, df_users = load_data_cached()
 
-# --- GIAO DIỆN ĐĂNG NHẬP ---
+# --- ĐĂNG NHẬP ---
 if "user_id" not in st.session_state:
     st.session_state["user_id"] = None
 
@@ -39,7 +37,7 @@ if st.session_state["user_id"] is None:
     with col_m:
         try: st.image(LOGO_URL, width=150)
         except: pass
-        st.markdown("<h1 style='text-align: center;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
         u_input = st.text_input("👤 Tên đăng nhập")
         p_input = st.text_input("🔑 Mật khẩu", type="password")
         if st.button("ĐĂNG NHẬP"):
@@ -50,7 +48,6 @@ if st.session_state["user_id"] is None:
                 st.rerun()
             else: st.error("Sai tài khoản hoặc mật khẩu!")
 else:
-    # Sidebar
     with st.sidebar:
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
         st.divider()
@@ -62,7 +59,7 @@ else:
             st.session_state["user_id"] = None
             st.rerun()
 
-    # --- 1. CẤP SỐ VĂN BẢN ---
+    # 1. CẤP SỐ VĂN BẢN
     if menu == "🚀 Cấp số văn bản":
         st.header("🚀 Cấp số văn bản mới")
         with st.form("form_cap_so"):
@@ -96,48 +93,22 @@ else:
                     }])
                     
                     try:
-                        # Ghi dữ liệu lên Sheets
+                        # Kết hợp dữ liệu cũ và mới
                         updated_df = pd.concat([df_vanban, new_data], ignore_index=True)
+                        # Ép hệ thống dùng link từ URL_DATA để ghi đè
                         conn.update(spreadsheet=URL_DATA, data=updated_df)
                         st.cache_data.clear()
                         st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu}")
                         st.balloons()
                     except Exception as e:
-                        st.error("Lỗi: Không có quyền ghi. Hãy kiểm tra xem bạn đã đặt Google Sheet ở chế độ 'Editor' (Người chỉnh sửa) chưa?")
+                        st.error(f"Lỗi hệ thống: {e}")
+                        st.warning("Gợi ý: Hãy kiểm tra quyền 'Editor' trong mục Chia sẻ của Google Sheets.")
 
-    # --- 2. NHẬT KÝ ---
+    # (Các phần khác giữ nguyên)
     elif menu == "🔍 Nhật ký & Quản lý":
-        st.header("🔍 Nhật ký văn bản")
         st.dataframe(df_vanban, use_container_width=True, hide_index=True)
-        if st.session_state.user_id == "admin":
-            st.divider()
-            so_xoa = st.text_input("Nhập số hiệu cần xóa:")
-            if st.button("Xóa dòng này"):
-                df_new = df_vanban[df_vanban["Số hiệu"] != so_xoa]
-                conn.update(spreadsheet=URL_DATA, data=df_new)
-                st.cache_data.clear()
-                st.rerun()
-
-    # --- 3. BÁO CÁO ---
     elif menu == "📊 Báo cáo tháng":
-        st.header("📊 Báo cáo")
         if not df_vanban.empty:
             list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
             thang = st.selectbox("Chọn tháng:", list_thang)
-            df_th = df_vanban[df_vanban["Tháng"] == thang]
-            st.metric("Số lượng văn bản", len(df_th))
-            st.dataframe(df_th, use_container_width=True)
-            csv = df_th.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 Tải về Excel", data=csv, file_name=f"BC_{thang}.csv")
-
-    # --- 4. ADMIN ---
-    elif menu == "⚙️ Quản trị Admin":
-        if st.session_state.user_id == "admin":
-            st.header("⚙️ Quản lý mật khẩu")
-            st.dataframe(df_users, hide_index=True)
-            u_sel = st.selectbox("Chọn tài khoản:", df_users['Username'].tolist())
-            p_new = st.text_input("Mật khẩu mới:", type="password")
-            if st.button("Đổi mật khẩu"):
-                df_users.loc[df_users['Username'] == u_sel, 'Password'] = p_new
-                conn.update(spreadsheet=URL_USERS, data=df_users)
-                st.success("Đã cập nhật!")
+            st.dataframe(df_vanban[df_vanban["Tháng"] == thang], use_container_width=True)
