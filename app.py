@@ -5,24 +5,26 @@ from datetime import datetime, date
 
 # --- CẤU HÌNH ---
 MA_TRUONG = "THQOB"
-LOGO_URL = "https://i.postimg.cc/mD83m8Yn/logo-edu.png" 
-URL_DATA = "https://docs.google.com/spreadsheets/d/1VQZ4uFtvb0Ur4livO5qPy5HGRntETgUOjnGpfgqDXtc/edit?usp=sharing"
+LOGO_URL = "ESTD2.png"
 URL_USERS = "https://docs.google.com/spreadsheets/d/1iEE9Vvvy-zSy-hNyh9cUmIbhldxVwTt4LcvOLHg9eCA/edit?usp=sharing"
 WEB_URL = "https://sovanbandiqob.streamlit.app/"
 
 st.set_page_config(page_title="Hệ thống Văn bản TH Quốc Oai B", layout="wide", page_icon="🏫")
 
-# --- KẾT NỐI ---
+# --- KẾT NỐI SERVICE ACCOUNT ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=2)
-def load_data_cached():
-    # Đọc dữ liệu bằng URL trực tiếp để tránh lỗi đồng bộ
-    df_vb = conn.read(spreadsheet=URL_DATA, worksheet="0")
-    df_us = conn.read(spreadsheet=URL_USERS, worksheet="0")
+def load_data():
+    # Đọc bảng chính dùng Service Account cấu hình trong Secrets
+    df_vb = conn.read(worksheet="0", ttl=0)
+    # Đọc bảng tài khoản (dùng URL vì bảng này chỉ cần ĐỌC)
+    df_us = conn.read(spreadsheet=URL_USERS, worksheet="0", ttl=0)
     return df_vb, df_us
 
-df_vanban, df_users = load_data_cached()
+df_vanban, df_users = load_data()
+
+# --- CSS GIAO DIỆN ---
+st.markdown("""<style>.main { background-color: #f0f2f6; } .stButton>button { border-radius: 8px; font-weight: bold; background-color: #1e3a8a; color: white; }</style>""", unsafe_allow_html=True)
 
 # --- ĐĂNG NHẬP ---
 if "user_id" not in st.session_state:
@@ -33,7 +35,7 @@ if st.session_state["user_id"] is None:
     with col_m:
         try: st.image(LOGO_URL, width=150)
         except: pass
-        st.markdown("<h1 style='text-align: center; color: #1e3a8a;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>TRƯỜNG TIỂU HỌC QUỐC OAI B</h1>", unsafe_allow_html=True)
         u_input = st.text_input("👤 Tên đăng nhập")
         p_input = st.text_input("🔑 Mật khẩu", type="password")
         if st.button("ĐĂNG NHẬP"):
@@ -44,6 +46,7 @@ if st.session_state["user_id"] is None:
                 st.rerun()
             else: st.error("Sai tài khoản hoặc mật khẩu!")
 else:
+    # Sidebar
     with st.sidebar:
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
         st.divider()
@@ -67,7 +70,6 @@ else:
                 if not trich_yeu.strip():
                     st.error("Vui lòng nhập trích yếu!")
                 else:
-                    # Logic lấy số
                     ky_hieu_dict = {"Công văn": "CV", "Quyết định": "QĐ", "Tờ trình": "TTr", "Thông báo": "TB", "Báo cáo": "BC", "Giấy mời": "GM", "Biên bản": "BB", "Kế hoạch": "KH", "Hợp đồng": "HĐ", "Quy chế": "QC"}
                     ky_hieu = ky_hieu_dict[loai_chon]
                     so_moi = len(df_vanban[df_vanban["Loại văn bản"] == loai_chon]) + 1
@@ -79,20 +81,17 @@ else:
                         "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                     }])
                     
-                    try:
-                        # Cập nhật dữ liệu
-                        updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
-                        # SỬ DỤNG PHƯƠNG THỨC CẬP NHẬT CƯỠNG ÉP
-                        conn.update(spreadsheet=URL_DATA, data=updated_df)
-                        st.cache_data.clear()
-                        st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu}")
-                        st.balloons()
-                    except Exception as e:
-                        st.error("Hệ thống vẫn chặn quyền ghi.")
-                        st.info("Vui lòng kiểm tra lại file Google Sheet: Nút Chia sẻ -> Bất kỳ ai có link -> Phải chọn là 'Người chỉnh sửa'.")
+                    # GHI DỮ LIỆU BẰNG SERVICE ACCOUNT
+                    updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
+                    conn.update(data=updated_df)
+                    st.cache_data.clear()
+                    st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu}")
+                    st.balloons()
+                    st.rerun()
 
     # 2. NHẬT KÝ
     elif menu == "🔍 Nhật ký & Quản lý":
+        st.header("🔍 Nhật ký lưu trữ")
         st.dataframe(df_vanban, use_container_width=True, hide_index=True)
 
     # 3. BÁO CÁO
