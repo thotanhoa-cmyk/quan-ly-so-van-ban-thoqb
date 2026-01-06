@@ -17,9 +17,12 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=600)
 def load_data_fast():
-    df_vb = conn.read(worksheet="Data")
-    df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1")
-    return df_vb, df_us
+    try:
+        df_vb = conn.read(worksheet="Data")
+        df_us = conn.read(spreadsheet=URL_USERS, worksheet="Sheet1")
+        return df_vb, df_us
+    except:
+        return None, None
 
 df_vanban, df_users = load_data_fast()
 
@@ -39,19 +42,19 @@ if st.session_state["user_id"] is None:
         u_input = st.text_input("👤 Tên đăng nhập")
         p_input = st.text_input("🔑 Mật khẩu", type="password")
         if st.button("ĐĂNG NHẬP"):
-            user_row = df_users[df_users['Username'].astype(str) == u_input]
-            if not user_row.empty and str(user_row.iloc[0]['Password']) == p_input:
-                st.session_state["user_id"] = u_input
-                st.session_state["user_name"] = user_row.iloc[0]['Fullname']
-                st.rerun()
-            else: st.error("Sai tài khoản hoặc mật khẩu!")
+            if df_users is not None:
+                user_row = df_users[df_users['Username'].astype(str) == u_input]
+                if not user_row.empty and str(user_row.iloc[0]['Password']) == p_input:
+                    st.session_state["user_id"] = u_input
+                    st.session_state["user_name"] = user_row.iloc[0]['Fullname']
+                    st.rerun()
+                else: st.error("Sai tài khoản hoặc mật khẩu!")
+            else: st.error("Không thể kết nối dữ liệu người dùng!")
 else:
+    # --- THANH SIDEBAR ---
     with st.sidebar:
         st.image(LOGO_URL, width=80)
         st.info(f"Cán bộ: **{st.session_state.user_name}**")
-        st.divider()
-        st.markdown("<p style='text-align: center;'>📷 QR TRUY CẬP</p>", unsafe_allow_html=True)
-        st.image(f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={WEB_URL}")
         st.divider()
         menu = st.radio("CHỨC NĂNG", ["🚀 Cấp số văn bản", "🔍 Nhật ký & Quản lý", "📊 Báo cáo tháng", "⚙️ Quản trị Admin"])
         if st.button("🚪 Đăng xuất"):
@@ -77,12 +80,10 @@ else:
                     so_hieu_tuy_chinh = st.text_input("Số hiệu tùy chỉnh (Vd: 01a/BC-THQOB)")
 
             if st.form_submit_button("🔥 XÁC NHẬN CẤP SỐ"):
-                # 1. Kiểm tra để trống
                 if not trich_yeu.strip():
                     st.error("⚠️ Vui lòng nhập trích yếu!")
-                # 2. KIỂM TRA TRÙNG TRÍCH YẾU (Tính năng mới bổ sung)
-                elif not df_vanban.empty and trich_yeu.strip() in df_vanban["Trích yếu"].values:
-                    st.warning("❌ Nội dung trích yếu này đã được cấp số rồi. Vui lòng kiểm tra lại nhật ký!")
+                elif df_vanban is not None and trich_yeu.strip() in df_vanban["Trích yếu"].values:
+                    st.warning("❌ Trích yếu này đã tồn tại trong hệ thống!")
                 else:
                     ky_hieu_dict = {"Công văn": "CV", "Quyết định": "QĐ", "Tờ trình": "TTr", "Thông báo": "TB", "Báo cáo": "BC", "Giấy mời": "GM", "Biên bản": "BB", "Kế hoạch": "KH", "Hợp đồng": "HĐ", "Quy chế": "QC"}
                     ky_hieu = ky_hieu_dict[loai_chon]
@@ -90,7 +91,8 @@ else:
                     if st.session_state.user_id == "admin" and is_chen and so_hieu_tuy_chinh:
                         so_hieu_final = so_hieu_tuy_chinh
                     else:
-                        so_moi = len(df_vanban[df_vanban["Loại văn bản"] == loai_chon]) + 1
+                        df_loai = df_vanban[df_vanban["Loại văn bản"] == loai_chon] if df_vanban is not None else []
+                        so_moi = len(df_loai) + 1
                         so_hieu_final = f"{so_moi:02d}/{ky_hieu}-{MA_TRUONG}"
                     
                     new_row = pd.DataFrame([{
@@ -99,25 +101,77 @@ else:
                         "Người ký": nguoi_ky, "Chức vụ": chuc_vu, "Ngày tạo hệ thống": datetime.now().strftime("%d/%m/%Y %H:%M"), "Tháng": ngay_vb.strftime("%m/%Y")
                     }])
                     
-                    conn.update(worksheet="Data", data=pd.concat([df_vanban, new_row], ignore_index=True))
+                    updated_df = pd.concat([df_vanban, new_row], ignore_index=True)
+                    conn.update(worksheet="Data", data=updated_df)
                     st.cache_data.clear()
                     st.success(f"✅ ĐÃ CẤP SỐ: {so_hieu_final}")
                     st.rerun()
 
-        # TRA CỨU NHANH
+        # --- TRA CỨU NHANH THEO TAB ---
         st.divider()
         st.subheader("📑 Tra cứu số hiệu đã cấp")
         tab_names = ["Tất cả"] + DANH_SACH_LOAI
         tabs = st.tabs(tab_names)
         for i, tab in enumerate(tabs):
             with tab:
-                if tab_names[i] == "Tất cả":
-                    df_tab = df_vanban.tail(10)[::-1]
-                else:
-                    df_tab = df_vanban[df_vanban["Loại văn bản"] == tab_names[i]].sort_values(by="Số hiệu", ascending=False)
-                if not df_tab.empty:
+                if df_vanban is not None and not df_vanban.empty:
+                    if tab_names[i] == "Tất cả":
+                        df_tab = df_vanban.tail(10)[::-1]
+                    else:
+                        df_tab = df_vanban[df_vanban["Loại văn bản"] == tab_names[i]].sort_values(by="Số hiệu", ascending=False)
                     st.table(df_tab[["Số hiệu", "Ngày văn bản", "Trích yếu", "Người ký"]].head(10))
-                else:
-                    st.info(f"Chưa có dữ liệu cho {tab_names[i]}.")
+                else: st.info("Chưa có dữ liệu.")
 
-    # --- CHỨC NĂNG 2:
+    # --- CHỨC NĂNG 2: NHẬT KÝ & QUẢN LÝ ---
+    elif menu == "🔍 Nhật ký & Quản lý":
+        st.header("🔍 Nhật ký văn bản")
+        if df_vanban is not None:
+            search = st.text_input("🔍 Tìm kiếm:")
+            df_display = df_vanban.sort_values(by=["Loại văn bản", "Số hiệu"], ascending=[True, False])
+            if search:
+                df_display = df_display[df_display.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+            if st.session_state.user_id == "admin":
+                st.divider()
+                st.subheader("🛠 QUYỀN ADMIN: XÓA SỐ HIỆU")
+                so_xoa = st.text_input("Nhập chính xác Số hiệu muốn xóa:")
+                if st.button("❌ XÁC NHẬN XÓA"):
+                    if so_xoa in df_vanban["Số hiệu"].values:
+                        df_new = df_vanban[df_vanban["Số hiệu"] != so_xoa]
+                        conn.update(worksheet="Data", data=df_new)
+                        st.cache_data.clear()
+                        st.success(f"Đã xóa thành công: {so_xoa}")
+                        st.rerun()
+                    else: st.error("Không tìm thấy số hiệu!")
+        else: st.error("Không tìm thấy dữ liệu Nhật ký!")
+
+    # --- CHỨC NĂNG 3: BÁO CÁO THÁNG ---
+    elif menu == "📊 Báo cáo tháng":
+        st.header("📊 Báo cáo quản trị")
+        if df_vanban is not None and not df_vanban.empty:
+            list_thang = sorted(df_vanban["Tháng"].unique(), reverse=True)
+            thang_sel = st.selectbox("Chọn tháng:", list_thang)
+            df_th = df_vanban[df_vanban["Tháng"] == thang_sel]
+            st.metric(f"Tổng văn bản tháng {thang_sel}", len(df_th))
+            st.dataframe(df_th, use_container_width=True, hide_index=True)
+            csv = df_th.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Tải Excel", data=csv, file_name=f"BC_{thang_sel}.csv")
+        else: st.info("Chưa có dữ liệu để làm báo cáo.")
+
+    # --- CHỨC NĂNG 4: QUẢN TRỊ ADMIN ---
+    elif menu == "⚙️ Quản trị Admin":
+        if st.session_state.user_id == "admin":
+            st.header("⚙️ Quản trị người dùng")
+            if df_users is not None:
+                st.dataframe(df_users, hide_index=True)
+                st.divider()
+                st.subheader("🔑 Đổi mật khẩu")
+                u_sel = st.selectbox("Chọn tài khoản:", df_users['Username'].tolist())
+                p_new = st.text_input("Mật khẩu mới:", type="password")
+                if st.button("Cập nhật mật khẩu"):
+                    df_users.loc[df_users['Username'] == u_sel, 'Password'] = p_new
+                    conn.update(spreadsheet=URL_USERS, worksheet="Sheet1", data=df_users)
+                    st.success(f"Đã đổi mật khẩu cho {u_sel}!")
+            else: st.error("Không tìm thấy dữ liệu người dùng!")
+        else: st.warning("Bạn không có quyền truy cập.")
